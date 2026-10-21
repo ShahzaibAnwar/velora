@@ -1,0 +1,44 @@
+name: Release
+
+# Builds the Windows installer and attaches it to a DRAFT pre-release named after the app version
+# (e.g. v0.1.0-alpha.1). Nothing is published until a maintainer reviews the draft and publishes it.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The app crate expects the built frontend (dist/) even for tests.
+      - run: npm run build
+      - run: cargo test --workspace
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Velora Download Manager v__VERSION__ (development pre-release)
+          releaseBody: |
+            Development pre-release for testing. Not a stable release.
+            See CHANGELOG.md for what's included and the known limitations.
+            The installer is per-user (no administrator rights) and is not code-signed yet,
+            so Windows SmartScreen may show a warning.
+          releaseDraft: true
+          prerelease: true
+      - name: SHA-256 of installers
+        shell: pwsh
+        run: Get-ChildItem target/release/bundle -Recurse -Include *.exe | Get-FileHash -Algorithm SHA256 | Format-List

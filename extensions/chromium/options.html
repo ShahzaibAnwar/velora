@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Velora — Extension options</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body class="page">
+    <header class="head">
+      <img src="icons/icon-48.png" alt="" width="32" height="32" />
+      <div>
+        <h1>Velora extension options</h1>
+        <p class="muted">Everything here stays in your browser.</p>
+      </div>
+    </header>
+
+    <h2>Download handoff</h2>
+    <p class="muted">
+      When on, downloads that match the file types below are sent to Velora instead of the browser.
+      The browser's copy is cancelled only after Velora accepts the link. Downloads that need you to be
+      signed in to a site may fail in Velora, because the extension never shares your cookies.
+    </p>
+    <label class="row"><input type="checkbox" id="enabled" /> Send matching downloads to Velora</label>
+    <label>File types (comma separated)
+      <textarea id="extensions" rows="3"></textarea>
+    </label>
+    <label>Only files larger than (MB)
+      <input type="number" id="min-size" min="0" step="1" />
+    </label>
+    <p><button id="save" class="primary">Save</button> <span id="saved" class="ok" hidden>Saved</span></p>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,70 @@
+/*
+ * Velora design tokens.
+ * Dark and light are designed separately (not inverted): light uses deeper accents for contrast on
+ * white and softer, cooler shadows.
+ */
+
+:root,
+[data-theme="dark"] {
+  --bg: #0b1020;
+  --sidebar: #111a2e;
+  --card: #172238;
+  --raised: #202e48;
+  --overlay: rgba(6, 10, 22, 0.62);
+  --fg: #f7f9ff;
+  --muted: #9baac4;
+  --subtle: #6f7f9c;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --cyan: #28d7e5;
+  --violet: #8c75ff;
+  --mint: #34e6a3;
+  --coral: #ff718b;
+  --amber: #ffc46b;
+  --accent: var(--cyan);
+  --accent-2: var(--violet);
+  --on-accent: #04121c;
+  --track: rgba(255, 255, 255, 0.07);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 24px 60px -16px rgba(0, 0, 0, 0.7), 0 6px 18px rgba(0, 0, 0, 0.35);
+  --glow: 0 0 0 1px color-mix(in oklab, var(--accent) 40%, transparent), 0 8px 30px -8px color-mix(in oklab, var(--accent) 45%, transparent);
+  --hover: rgba(255, 255, 255, 0.045);
+  color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #f5f8fc;
+  --sidebar: #ffffff;
+  --card: #ffffff;
+  --raised: #eef3f9;
+  --overlay: rgba(22, 35, 58, 0.28);
+  --fg: #16233a;
+  --muted: #68778c;
+  --subtle: #8a97aa;
+  --line: rgba(22, 35, 58, 0.09);
+  --line-strong: rgba(22, 35, 58, 0.16);
+  --cyan: #089fb8;
+  --violet: #6f55f2;
+  --mint: #0ea371;
+  --coral: #e0456a;
+  --amber: #c98a1b;
+  --accent: var(--cyan);
+  --accent-2: var(--violet);
+  --on-accent: #ffffff;
+  --track: rgba(22, 35, 58, 0.07);
+  --shadow-sm: 0 1px 2px rgba(22, 35, 58, 0.06);
+  --shadow-md: 0 10px 28px -12px rgba(22, 35, 58, 0.18), 0 2px 6px rgba(22, 35, 58, 0.05);
+  --shadow-lg: 0 28px 64px -20px rgba(22, 35, 58, 0.28), 0 6px 18px rgba(22, 35, 58, 0.08);
+  --hover: rgba(22, 35, 58, 0.04);
+  color-scheme: light;
+}
+
+/* Accent choices */
+[data-accent="violet"] { --accent: var(--violet); --accent-2: var(--cyan); }
+[data-accent="mint"] { --accent: var(--mint); --accent-2: var(--cyan); }
+[data-accent="coral"] { --accent: var(--coral); --accent-2: var(--violet); }
+
+/* Density */
+:root { --row-pad: 14px; --card-gap: 10px; --radius-card: 16px; }
+[data-density="compact"] { --row-pad: 9px; --card-gap: 6px; --radius-card: 12px; }

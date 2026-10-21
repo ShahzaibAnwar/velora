@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Velora Download Manager",
+  "short_name": "Velora",
+  "version": "0.1.2",
+  "description": "Send links, files and media to Velora Download Manager.",
+  "browser_specific_settings": {
+    "gecko": { "id": "velora-extension@velora-download-manager", "strict_min_version": "115.0" }
+  },
+  "permissions": ["contextMenus", "nativeMessaging", "activeTab", "scripting", "storage"],
+  "optional_permissions": ["downloads"],
+  "background": { "scripts": ["background.js"], "type": "module" },
+  "action": {
+    "default_title": "Velora",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png" }
+  },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "icons": { "16": "icons/icon-16.png", "32": "icons/icon-32.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" }
+}

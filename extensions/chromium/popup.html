@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Velora</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <header class="head">
+      <img src="icons/icon-48.png" alt="" width="28" height="28" />
+      <div>
+        <h1>Velora</h1>
+        <p id="status" class="muted">Checking connection…</p>
+      </div>
+    </header>
+
+    <section class="actions">
+      <button id="send-page" class="primary">Send this page's address</button>
+      <button id="scan">Find files and media on this page</button>
+    </section>
+
+    <section id="results" hidden>
+      <h2 id="results-title">Found on this page</h2>
+      <ul id="list"></ul>
+      <p class="hint">Only direct files are offered. Streaming playlists (HLS/DASH) and protected streams are not downloaded.</p>
+    </section>
+
+    <footer>
+      <a href="options.html" target="_blank">Options</a>
+    </footer>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

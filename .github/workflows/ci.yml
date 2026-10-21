@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (types, lint, tests, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  rust:
+    name: Rust (fmt, clippy, tests) on Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # The app crate embeds the built frontend at compile time.
+      - run: npm ci
+      - run: npm run build
+      - run: cargo fmt --all -- --check
+      - name: Clippy (download engine)
+        run: cargo clippy -p velora-engine --all-targets -- -D warnings
+      # Not yet verified locally (the maintainer's PC blocks unsigned build helpers). Reported in the
+      # log without failing CI; remove continue-on-error once the first run is clean.
+      - name: Clippy (desktop app)
+        continue-on-error: true
+        run: cargo clippy -p velora --all-targets -- -D warnings
+      - name: Tests (engine, app; includes 25 local-server download scenarios)
+        run: cargo test --workspace
+
+  audit:
+    name: Dependency audit (advisory)
+    runs-on: ubuntu-latest
+    # Advisory until the licence allow-list in deny.toml has been confirmed against a real run.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories licenses bans sources
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm audit --omit=dev --audit-level=high

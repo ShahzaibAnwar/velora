@@ -1,0 +1,136 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-sidebar: var(--sidebar);
+  --color-card: var(--card);
+  --color-raised: var(--raised);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-on-accent: var(--on-accent);
+  --color-cyan: var(--cyan);
+  --color-violet: var(--violet);
+  --color-mint: var(--mint);
+  --color-coral: var(--coral);
+  --color-amber: var(--amber);
+  --color-hover: var(--hover);
+  --color-track: var(--track);
+  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: 13.5px;
+    line-height: 1.45;
+    font-feature-settings: "cv11", "ss01", "tnum" 0;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    user-select: none;
+  }
+  input,
+  textarea,
+  [data-selectable] {
+    user-select: text;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 35%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid color-mix(in oklab, var(--accent) 80%, transparent);
+    outline-offset: 2px;
+  }
+  button {
+    cursor: default;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .scroll-area {
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  .drag {
+    -webkit-app-region: drag;
+  }
+  .text-gradient {
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .surface {
+    background: var(--card);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+/* Progress shimmer: only while a download is active, never when hidden or reduced motion is on. */
+@keyframes velora-shimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+.progress-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  animation: velora-shimmer 1.8s ease-in-out infinite;
+}
+[data-motion="reduced"] .progress-shimmer::after,
+[data-hidden="true"] .progress-shimmer::after {
+  animation: none;
+  display: none;
+}
+
+@keyframes velora-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+.live-dot {
+  animation: velora-pulse 1.6s ease-in-out infinite;
+}
+[data-motion="reduced"] .live-dot,
+[data-hidden="true"] .live-dot {
+  animation: none;
+}
+
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+[data-motion="reduced"] [data-state="open"] {
+  animation: none !important;
+}
+
+@keyframes velora-spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: velora-spin 0.9s linear infinite;
+}

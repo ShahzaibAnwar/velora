@@ -1,0 +1,8 @@
+# Keep LF in the repository and working tree on every OS (matches .editorconfig and rustfmt).
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.bmp binary
