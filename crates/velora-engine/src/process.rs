@@ -25,6 +25,10 @@ impl ToolProcess {
     {
         let mut cmd = Command::new(program);
         cmd.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
+        // Run from the helper's own folder, never from a folder holding downloaded files.
+        if let Some(dir) = program.parent().filter(|d| d.is_dir()) {
+            cmd.current_dir(dir);
+        }
         // yt-dlp is Python: make it print UTF-8 whatever the console code page is.
         cmd.env("PYTHONIOENCODING", "utf-8").env("PYTHONUTF8", "1");
         #[cfg(windows)]

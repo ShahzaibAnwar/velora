@@ -145,16 +145,23 @@ async fn live_ytdlp_resolves_and_downloads() {
             url: pick.url.clone(),
             file_name: Some(pick.file_name.clone()),
             media_format: pick.format.clone(),
-            start: StartMode::Now,
+            start: StartMode::Paused,
             ..Default::default()
         })
         .unwrap();
     assert_eq!(rec.kind, DownloadKind::Media);
+    // A downloaded file named like yt-dlp's config must never be read as options.
+    std::fs::create_dir_all(&rec.dest_dir).unwrap();
+    let planted = std::path::Path::new(&rec.dest_dir).join("yt-dlp.conf");
+    std::fs::write(&planted, "-o planted.%(ext)s\n").unwrap();
+    engine.resume(&rec.id).unwrap();
     let rec = wait_live(&engine, &rec.id, 300, |r| r.status == DownloadStatus::Completed).await;
     assert_eq!(rec.status, DownloadStatus::Completed, "{:?}", rec.error);
     let len = std::fs::metadata(rec.target_path()).unwrap().len();
     println!("downloaded {} ({len} bytes)", rec.file_name);
     assert!(len > 10_000);
+    assert_eq!(rec.file_name, pick.file_name, "the planted config was ignored");
+    std::fs::remove_file(&planted).unwrap();
     let leftovers: Vec<_> = std::fs::read_dir(&rec.dest_dir).unwrap().flatten().map(|e| e.file_name()).collect();
     assert_eq!(leftovers.len(), 1, "only the finished file remains: {leftovers:?}");
 }

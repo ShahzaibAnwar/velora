@@ -93,7 +93,7 @@ fn network_args(settings: &Settings) -> Vec<String> {
 
 /// Ask yt-dlp what `url` offers. `Ok(None)` means yt-dlp doesn't recognise the page.
 pub async fn resolve(ytdlp: &Path, settings: &Settings, url: &Url) -> Result<Option<ResolvedMedia>, ErrorInfo> {
-    let mut args = vec!["-J".to_string(), "--no-playlist".into(), "--no-warnings".into(), "--no-color".into()];
+    let mut args = vec!["--ignore-config".to_string(), "-J".into(), "--no-playlist".into(), "--no-warnings".into(), "--no-color".into()];
     args.extend(network_args(settings));
     args.extend(["--".into(), url.to_string()]);
     let mut proc = ToolProcess::spawn(ytdlp, &args).map_err(|e| ErrorInfo::new("tool_run", format!("Couldn't start yt-dlp: {e}")))?;
@@ -317,6 +317,9 @@ async fn run_inner(env: &TaskEnv, tools: &Tools) -> Result<(), Option<ErrorInfo>
     });
 
     let mut args: Vec<String> = vec![
+        // Must come first. yt-dlp otherwise reads `yt-dlp.conf` from the `-P` folder, i.e. the
+        // download folder, where a downloaded file could plant options such as `--exec`.
+        "--ignore-config".into(),
         "--newline".into(),
         "--no-color".into(),
         "--no-playlist".into(),
