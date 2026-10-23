@@ -20,6 +20,13 @@ All notable changes to Velora are documented here. The format follows
 - The PC no longer goes to sleep while downloads are running.
 - Extension 0.1.3: sends video pages (right-click a playing video) and magnet links, and offers HLS/DASH
   links found on a page. Only DRM streaming services are still refused.
+
+### Security
+- yt-dlp runs with `--ignore-config`, so a downloaded file named `yt-dlp.conf` can't inject options.
+- Helper downloads give up after 60 s without data instead of waiting forever.
+- Dependency updates from the audit: tokio 1.54.1 (1.54.0 was yanked for an `Interval` race), zip 9
+  (extraction advisories; Velora never used the affected `extract`), clipboard-win 5.4.3 (yanked
+  version), and torrent piece hashing moved from the unmaintained crypto-hash crate to ring.
 - X (Twitter) post videos: a post link resolves to the post's public MP4 files (quality picker in the
   Add dialog; best quality when the browser sends a post directly). Public posts only.
 - Extension 0.1.1: "Video in this post" on X, right-clicking an X video sends the post, and a clear

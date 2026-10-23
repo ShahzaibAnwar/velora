@@ -31,6 +31,8 @@ const EXE: &str = if cfg!(windows) { ".exe" } else { "" };
 const MAX_YTDLP_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_FFMPEG_BYTES: u64 = 512 * 1024 * 1024;
 const YTDLP_REFRESH: Duration = Duration::from_secs(7 * 24 * 3600);
+/// Give up on a helper download that sends nothing for this long.
+const STALL_TIMEOUT: Duration = Duration::from_secs(60);
 
 pub struct Tools {
     /// `<app data>/tools`. `None` disables installing (tests); helpers on `PATH` are still used.
@@ -176,7 +178,9 @@ fn extract_binaries(zip_path: &Path, out: &Path, names: &[&str]) -> std::io::Res
     let mut found = 0;
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(std::io::Error::other)?;
-        let Some(file_name) = entry.name().rsplit('/').next().map(str::to_ascii_lowercase) else { continue };
+        // Only the base name is used, and only for the expected programs, so archive paths never
+        // decide where anything is written.
+        let Ok(file_name) = entry.name().map(|n| n.rsplit('/').next().unwrap_or_default().to_ascii_lowercase()) else { continue };
         if entry.is_file() && names.contains(&file_name.as_str()) {
             let mut f = std::fs::File::create(out.join(&file_name))?;
             std::io::copy(&mut entry, &mut f)?;
@@ -221,8 +225,16 @@ async fn fetch_to_file(client: &Client, url: &str, path: &Path, max: u64) -> Res
     let mut hasher = Sha256::new();
     let mut total = 0u64;
     let mut stream = resp.bytes_stream();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| e.to_string())?;
+    loop {
+        let chunk = match tokio::time::timeout(STALL_TIMEOUT, stream.next()).await {
+            Err(_) => {
+                drop(file);
+                let _ = std::fs::remove_file(path);
+                return Err("the download stopped sending data".into());
+            }
+            Ok(None) => break,
+            Ok(Some(chunk)) => chunk.map_err(|e| e.to_string())?,
+        };
         total += chunk.len() as u64;
         if total > max {
             drop(file);

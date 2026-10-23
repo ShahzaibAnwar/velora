@@ -166,6 +166,80 @@ async fn live_ytdlp_resolves_and_downloads() {
     assert_eq!(leftovers.len(), 1, "only the finished file remains: {leftovers:?}");
 }
 
+/// Measures plain reqwest throughput against a large GitHub release asset for 15 s, with the
+/// engine's own client settings and with reqwest defaults. Opt-in diagnostic.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs internet; diagnostic"]
+async fn live_http_throughput() {
+    use futures_util::StreamExt;
+    let url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-lgpl.zip";
+    for (label, client) in [
+        ("engine client", velora_engine::net::build_client(&velora_engine::Settings::default()).unwrap()),
+        ("reqwest default", reqwest::Client::new()),
+    ] {
+        let start = std::time::Instant::now();
+        let resp = client.get(url).send().await.unwrap();
+        let version = resp.version();
+        let mut stream = resp.bytes_stream();
+        let mut total = 0u64;
+        let mut chunks = 0u64;
+        while start.elapsed() < std::time::Duration::from_secs(15) {
+            match tokio::time::timeout(std::time::Duration::from_secs(5), stream.next()).await {
+                Ok(Some(Ok(c))) => {
+                    total += c.len() as u64;
+                    chunks += 1;
+                }
+                _ => break,
+            }
+        }
+        let secs = start.elapsed().as_secs_f64();
+        println!("{label}: {version:?} {:.0} KB/s ({total} bytes in {chunks} chunks, {secs:.1}s)", total as f64 / secs / 1024.0);
+    }
+    // The same stream written to disk, as the helper installer does.
+    use std::io::Write;
+    let dir = tempfile::tempdir().unwrap();
+    let mut file = std::fs::File::create(dir.path().join("probe.zip.download")).unwrap();
+    let client = velora_engine::net::build_client(&velora_engine::Settings::default()).unwrap();
+    let start = std::time::Instant::now();
+    let mut stream = client.get(url).send().await.unwrap().bytes_stream();
+    let mut total = 0u64;
+    while start.elapsed() < std::time::Duration::from_secs(15) {
+        match tokio::time::timeout(std::time::Duration::from_secs(5), stream.next()).await {
+            Ok(Some(Ok(c))) => {
+                file.write_all(&c).unwrap();
+                total += c.len() as u64;
+            }
+            _ => break,
+        }
+    }
+    println!("engine client + file writes: {:.0} KB/s", total as f64 / start.elapsed().as_secs_f64() / 1024.0);
+}
+
+/// Installs yt-dlp and ffmpeg into an empty folder from their GitHub releases (checksums verified,
+/// ffmpeg unpacked from its zip) and runs both. Opt-in; run with neither program on PATH.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs internet; downloads about 100 MB"]
+async fn live_tools_install_and_run() {
+    use velora_engine::tools::Tools;
+
+    let dir = tempfile::tempdir().unwrap();
+    let tools = Tools::new(Some(dir.path().to_path_buf()));
+    let client = reqwest::Client::new();
+    let ytdlp = tools.ensure_ytdlp(&client).await.unwrap();
+    assert!(ytdlp.starts_with(dir.path()), "installed, not taken from PATH: {}", ytdlp.display());
+    let out = std::process::Command::new(&ytdlp).arg("--version").output().unwrap();
+    println!("yt-dlp {}", String::from_utf8_lossy(&out.stdout).trim());
+    assert!(out.status.success());
+    if cfg!(windows) {
+        let ffmpeg_dir = tools.ensure_ffmpeg(&client).await.unwrap();
+        assert!(ffmpeg_dir.starts_with(dir.path()), "installed, not taken from PATH: {}", ffmpeg_dir.display());
+        let out = std::process::Command::new(ffmpeg_dir.join("ffmpeg.exe")).arg("-version").output().unwrap();
+        println!("{}", String::from_utf8_lossy(&out.stdout).lines().next().unwrap_or_default());
+        assert!(out.status.success());
+        assert!(ffmpeg_dir.join("ffprobe.exe").is_file());
+    }
+}
+
 /// Resolves a real torrent, downloads part of it, pauses, resumes from the pieces on disk, then
 /// cancels and checks the data is removed. Opt-in; VELORA_LIVE_TORRENT picks another torrent.
 #[tokio::test(flavor = "multi_thread")]
