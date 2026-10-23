@@ -20,12 +20,15 @@ use crate::download::checkpoint;
 use crate::download::live::LiveState;
 use crate::download::task::{self, sha256_file, TaskEnv, TaskHooks, TaskOutcome};
 use crate::download::WriteFault;
+use crate::media::ytdlp;
 use crate::model::*;
 use crate::net::probe::name_from_url;
 use crate::net::{build_client, probe, RateLimiter};
 use crate::security::{confine, parse_download_url, redact_url, sanitize_file_name, unique_file_name, validate_dest_dir};
 use crate::settings::{Settings, MAX_CONNECTIONS};
 use crate::storage::Store;
+use crate::tools::Tools;
+use crate::torrent::{self, TorrentHub};
 use crate::util::{now_ms, same_path};
 
 pub type EventSink = Arc<dyn Fn(EngineEvent) + Send + Sync>;
@@ -33,6 +36,9 @@ pub type EventSink = Arc<dyn Fn(EngineEvent) + Send + Sync>;
 pub struct EngineConfig {
     /// SQLite database file. `None` keeps everything in memory (tests).
     pub db_path: Option<PathBuf>,
+    /// App data folder for helper programs (`tools/`) and torrent metadata (`torrents/`). `None`
+    /// disables installing helpers; programs already on `PATH` are still used.
+    pub data_dir: Option<PathBuf>,
     /// Used when the stored settings have no download folder yet.
     pub default_download_dir: PathBuf,
     pub on_event: EventSink,
@@ -44,7 +50,12 @@ pub struct EngineConfig {
 
 impl EngineConfig {
     pub fn new(db_path: Option<PathBuf>, default_download_dir: PathBuf, on_event: EventSink) -> Self {
-        Self { db_path, default_download_dir, on_event, tick: Duration::from_millis(500), write_fault: None }
+        Self { db_path, data_dir: None, default_download_dir, on_event, tick: Duration::from_millis(500), write_fault: None }
+    }
+
+    pub fn with_data_dir(mut self, dir: PathBuf) -> Self {
+        self.data_dir = Some(dir);
+        self
     }
 }
 
@@ -113,6 +124,8 @@ struct Inner {
     wake: Notify,
     shutdown: CancellationToken,
     write_fault: Option<WriteFault>,
+    tools: Arc<Tools>,
+    torrents: Arc<TorrentHub>,
     /// Engine methods may be called from threads outside the runtime (e.g. the UI thread).
     rt: tokio::runtime::Handle,
 }
@@ -172,6 +185,8 @@ impl Engine {
             wake: Notify::new(),
             shutdown: CancellationToken::new(),
             write_fault: config.write_fault,
+            tools: Arc::new(Tools::new(config.data_dir.as_ref().map(|d| d.join("tools")))),
+            torrents: Arc::new(TorrentHub::new(config.data_dir.as_ref().map(|d| d.join("torrents")), config.default_download_dir.clone())),
             rt: tokio::runtime::Handle::current(),
         });
         if !recovered.is_empty() {
@@ -291,7 +306,13 @@ impl Engine {
     // -- Adding ----------------------------------------------------------------------------------
 
     /// Ask the server about a URL (no retries, bounded by the read timeout).
+    /// Ask the server about a URL (no retries, bounded by the read timeout). For torrents this reads
+    /// the torrent's metadata, which for magnet links can take a while.
     pub async fn probe(&self, url: &str, referrer: Option<&str>) -> Result<ProbeInfo, ErrorInfo> {
+        if torrent::is_torrent_link(url) {
+            let link = torrent::parse_torrent_link(url)?;
+            return self.inner.torrents.probe(&link).await;
+        }
         let url = parse_download_url(url)?;
         let client = self.inner.client.read().unwrap().clone();
         let timeout = Duration::from_secs(self.settings().read_timeout_secs);
@@ -301,12 +322,46 @@ impl Engine {
         }
     }
 
-    /// If `url` is a page a media resolver understands (e.g. an X post), return its direct media
-    /// files. `Ok(None)` means the URL is not such a page and should be downloaded as-is.
+    /// If `url` is a page or stream a media resolver understands (an X post, a video site, an HLS
+    /// playlist…), return what it offers. `Ok(None)` means the URL should be downloaded as-is.
+    ///
+    /// Known video sites and stream manifests go to yt-dlp, which is installed on first use. Other
+    /// web pages are offered to yt-dlp only once it is installed, so plain file links never wait
+    /// for it.
     pub async fn resolve_media(&self, url: &str) -> Result<Option<crate::media::ResolvedMedia>, ErrorInfo> {
+        if torrent::is_torrent_link(url) {
+            return Ok(None);
+        }
         let url = parse_download_url(url)?;
         let client = self.inner.client.read().unwrap().clone();
-        crate::media::resolve(&client, &url).await
+        if let Some(m) = crate::media::resolve(&client, &url).await? {
+            return Ok(Some(m));
+        }
+        let settings = self.settings();
+        let tools = &self.inner.tools;
+        let program: Option<PathBuf> = if ytdlp::is_known_site(&url) || ytdlp::is_stream_manifest(&url) {
+            Some(tools.ensure_ytdlp(&client).await?)
+        } else if crate::security::url::looks_like_file_link(url.as_str()).is_none() {
+            match tools.ytdlp() {
+                Some(path) => {
+                    // Only pages and streams are worth asking yt-dlp about.
+                    let timeout = Duration::from_secs(settings.read_timeout_secs.min(15));
+                    let mime = match tokio::time::timeout(timeout, probe(&client, &url, None)).await {
+                        Ok(Ok(info)) => info.mime.unwrap_or_default(),
+                        _ => String::new(),
+                    };
+                    let page = mime.to_ascii_lowercase().starts_with("text/html") || ytdlp::is_stream_mime(&mime);
+                    page.then_some(path)
+                }
+                None => None,
+            }
+        } else {
+            None
+        };
+        match program {
+            Some(path) => ytdlp::resolve(&path, &settings, &url).await,
+            None => Ok(None),
+        }
     }
 
     /// Check a prospective download for duplicates and name conflicts without adding it.
@@ -317,6 +372,9 @@ impl Engine {
         dest_dir: Option<&str>,
         category: Option<Category>,
     ) -> Result<AddCheck, ErrorInfo> {
+        if torrent::is_torrent_link(url) {
+            return self.check_add_torrent(url, file_name, dest_dir, category);
+        }
         let parsed = parse_download_url(url)?;
         let name = resolve_name(&parsed, file_name);
         let category = category.unwrap_or_else(|| categorize(&name, None));
@@ -346,17 +404,57 @@ impl Engine {
         })
     }
 
+    /// Torrents choose their own file layout when they start, so only duplicates matter here.
+    fn check_add_torrent(
+        &self,
+        url: &str,
+        file_name: Option<&str>,
+        dest_dir: Option<&str>,
+        category: Option<Category>,
+    ) -> Result<AddCheck, ErrorInfo> {
+        let link = torrent::parse_torrent_link(url)?;
+        let name = file_name.map(sanitize_file_name).filter(|n| !n.is_empty()).unwrap_or_else(|| torrent::name_hint(&link));
+        let category = category.unwrap_or_else(|| categorize(&name, None));
+        let dir = match dest_dir.filter(|d| !d.trim().is_empty()) {
+            Some(d) => d.to_string(),
+            None => self.inner.dir_for_category(category),
+        };
+        validate_dest_dir(&dir)?;
+        let duplicate_of = self.inner.records.lock().unwrap().values().find(|r| !r.status.is_finished() && r.url == link).cloned();
+        Ok(AddCheck {
+            duplicate_of,
+            file_exists: false,
+            conflicts_with: None,
+            dest_dir: dir,
+            suggested_name: name.clone(),
+            file_name: name,
+            category,
+        })
+    }
+
     pub fn add(&self, req: AddRequest) -> Result<DownloadRecord, ErrorInfo> {
-        let url = parse_download_url(&req.url)?;
-        if let Some(site) = crate::media::unsupported_site(&url) {
-            return Err(ErrorInfo::new(
-                "unsupported_site",
-                format!("Velora doesn't download videos from {site}. They're protected or only available when you're signed in."),
-            ));
-        }
+        let is_torrent = torrent::is_torrent_link(&req.url);
+        let media_format = req.media_format.as_deref().map(str::trim).filter(|f| !f.is_empty() && f.len() <= 512).map(str::to_string);
+        let kind = match (is_torrent, &media_format) {
+            (true, _) => DownloadKind::Torrent,
+            (false, Some(_)) => DownloadKind::Media,
+            (false, None) => DownloadKind::Http,
+        };
         let settings = self.settings();
         let given = req.file_name.as_deref().map(str::trim).filter(|n| !n.is_empty());
-        let mut name = resolve_name(&url, given);
+        let (link, mut name) = if is_torrent {
+            // The real name comes from the metadata; Velora picks a free folder when it starts.
+            let link = torrent::parse_torrent_link(&req.url)?;
+            let name = given.map(sanitize_file_name).unwrap_or_else(|| torrent::name_hint(&link));
+            (link, name)
+        } else {
+            let url = parse_download_url(&req.url)?;
+            if let Some(site) = crate::media::unsupported_site(&url) {
+                return Err(crate::media::unsupported_error(site));
+            }
+            let name = resolve_name(&url, given);
+            (url.to_string(), name)
+        };
         let category = req.category.unwrap_or_else(|| categorize(&name, None));
         let (dest_dir, dest_auto) = match req.dest_dir.as_deref().map(str::trim).filter(|d| !d.is_empty()) {
             Some(d) => (d.to_string(), false),
@@ -369,7 +467,7 @@ impl Engine {
             None => None,
         };
         let id = uuid::Uuid::new_v4().to_string();
-        if !req.overwrite {
+        if !req.overwrite && !is_torrent {
             let records = self.inner.records.lock().unwrap();
             let taken = |n: &str| records.values().any(|r| !r.status.is_finished() && same_path(&r.target_path(), &dir_path.join(n)));
             name = unique_file_name(&dir_path, &name, &taken);
@@ -384,7 +482,10 @@ impl Engine {
         let queue_pos = self.inner.queue_position_for(req.priority);
         let rec = DownloadRecord {
             id: id.clone(),
-            url: url.to_string(),
+            kind,
+            url: link,
+            media_format,
+            info_hash: None,
             final_url: None,
             file_name: name,
             name_auto: given.is_none(),
@@ -413,7 +514,7 @@ impl Engine {
             },
             checksum,
             checksum_state: ChecksumState::None,
-            overwrite: req.overwrite,
+            overwrite: req.overwrite && !is_torrent,
             restart_pending: false,
         };
         self.inner.store.upsert(&rec)?;
@@ -466,9 +567,10 @@ impl Engine {
         if self.inner.stop_running(id, StopReason::Restart) {
             return Ok(());
         }
-        let target = rec.target_path();
-        let _ = std::fs::remove_file(checkpoint::part_path(&target));
-        let _ = std::fs::remove_file(checkpoint::checkpoint_path(&target));
+        // A finished file stays; the new copy gets a free name (HTTP) or is re-checked (torrent).
+        if rec.status != DownloadStatus::Completed || rec.kind == DownloadKind::Http {
+            delete_partial(&rec);
+        }
         self.inner.update(id, &mut |r| {
             r.restart_pending = true;
             r.downloaded = 0;
@@ -662,6 +764,9 @@ impl Engine {
         if name == rec.file_name {
             return Ok(rec);
         }
+        if rec.kind != DownloadKind::Http && rec.status != DownloadStatus::Completed {
+            return Err(ErrorInfo::new("invalid_state", "This download can be renamed once it has finished."));
+        }
         let dir = validate_dest_dir(&rec.dest_dir)?;
         let new_target = confine(&dir, &name)?;
         if new_target.exists() || self.inner.path_reserved(id, &new_target) {
@@ -747,6 +852,8 @@ impl Engine {
             .list()
             .into_iter()
             .map(|r| ExportItem {
+                kind: r.kind,
+                media_format: r.media_format,
                 url: r.url,
                 file_name: r.file_name,
                 dest_dir: r.dest_dir,
@@ -772,7 +879,12 @@ impl Engine {
         for item in file.items {
             let finished = item.status == DownloadStatus::Completed;
             if finished {
-                let Ok(url) = parse_download_url(&item.url) else { continue };
+                let url = if item.kind == DownloadKind::Torrent {
+                    torrent::parse_torrent_link(&item.url)
+                } else {
+                    parse_download_url(&item.url).map(|u| u.to_string())
+                };
+                let Ok(url) = url else { continue };
                 let Ok(dir) = validate_dest_dir(&item.dest_dir) else { continue };
                 let name = sanitize_file_name(&item.file_name);
                 if confine(&dir, &name).is_err() {
@@ -780,7 +892,10 @@ impl Engine {
                 }
                 let rec = DownloadRecord {
                     id: uuid::Uuid::new_v4().to_string(),
-                    url: url.to_string(),
+                    kind: item.kind,
+                    url,
+                    media_format: item.media_format,
+                    info_hash: None,
                     final_url: None,
                     file_name: name,
                     name_auto: false,
@@ -820,6 +935,7 @@ impl Engine {
                     category: Some(item.category),
                     start: StartMode::Paused,
                     checksum: item.checksum,
+                    media_format: item.media_format,
                     ..Default::default()
                 };
                 if self.add(req).is_err() {
@@ -862,6 +978,10 @@ struct ExportFile {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportItem {
+    #[serde(default)]
+    kind: DownloadKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    media_format: Option<String>,
     url: String,
     file_name: String,
     dest_dir: String,
@@ -885,6 +1005,11 @@ fn resolve_name(url: &url::Url, given: Option<&str>) -> String {
 }
 
 fn delete_partial(rec: &DownloadRecord) {
+    match rec.kind {
+        DownloadKind::Media => return crate::media::ytdlp::delete_partial(rec),
+        DownloadKind::Torrent => return torrent::delete_partial(rec),
+        DownloadKind::Http => {}
+    }
     let target = rec.target_path();
     for p in [checkpoint::part_path(&target), checkpoint::checkpoint_path(&target)] {
         if let Err(e) = std::fs::remove_file(&p) {
@@ -1032,8 +1157,13 @@ impl Inner {
         let inner = self.clone();
         let task_id = id.to_string();
         let task_reason = reason.clone();
+        let (kind, tools, torrents) = (rec.kind, self.tools.clone(), self.torrents.clone());
         let handle = self.rt.spawn(async move {
-            let outcome = task::run(env).await;
+            let outcome = match kind {
+                DownloadKind::Http => task::run(env).await,
+                DownloadKind::Media => crate::media::ytdlp::run(env, tools).await,
+                DownloadKind::Torrent => torrent::run(env, torrents).await,
+            };
             inner.on_task_finished(&task_id, outcome, StopReason::from_u8(task_reason.load(Ordering::Acquire)));
         });
         tracing::info!(%id, auto, "download started");

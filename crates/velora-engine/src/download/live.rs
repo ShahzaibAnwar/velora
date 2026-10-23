@@ -53,6 +53,11 @@ impl LiveState {
         self.connections.fetch_sub(1, Ordering::Relaxed);
     }
 
+    /// For engines that report their own connection count (BitTorrent peers).
+    pub fn set_connections(&self, n: u32) {
+        self.connections.store(n, Ordering::Relaxed);
+    }
+
     pub fn downloaded(&self) -> u64 {
         if self.single_mode.load(Ordering::Acquire) {
             self.single_bytes.load(Ordering::Acquire)

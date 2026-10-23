@@ -35,6 +35,7 @@ export function percent(done: number, total: number | null | undefined): number 
 }
 
 export function hostOf(url: string): string {
+  if (/^magnet:/i.test(url)) return "BitTorrent";
   try {
     return new URL(url).hostname.replace(/^www\./, "");
   } catch {

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Velora Download Manager",
   "short_name": "Velora",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Send links, files and media to Velora Download Manager.",
   "browser_specific_settings": {
     "gecko": { "id": "velora-extension@velora-download-manager", "strict_min_version": "115.0" }

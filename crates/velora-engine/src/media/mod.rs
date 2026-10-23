@@ -1,9 +1,11 @@
-//! Media resolvers: turn a page address into the direct media files it shows.
+//! Media resolvers: turn a page address into the media it shows.
 //!
-//! Only sites that publish ordinary, unprotected files for public content are supported. A resolver
-//! never logs in, never uses cookies and never touches DRM-protected or private media.
+//! X posts are resolved natively to their MP4 files. Other video sites and HLS/DASH streams go
+//! through yt-dlp ([`ytdlp`]). A resolver never logs in, never uses the browser's cookies and never
+//! touches DRM-protected media.
 
 pub mod x;
+pub mod ytdlp;
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -24,6 +26,12 @@ pub struct MediaVariant {
     pub mime: String,
     /// Suggested file name for this variant.
     pub file_name: String,
+    /// yt-dlp format selector. When set, `url` is the page and yt-dlp does the download.
+    #[serde(default)]
+    pub format: Option<String>,
+    /// Size in bytes, exact or estimated by the site.
+    #[serde(default)]
+    pub size: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -38,16 +46,10 @@ pub struct ResolvedMedia {
     pub variants: Vec<MediaVariant>,
 }
 
-/// Sites whose videos Velora deliberately doesn't download: protected by DRM or obfuscated stream
-/// signatures, or only available when signed in. Velora never bypasses either. Only the page hosts
-/// are listed; ordinary files linked from these sites are unaffected.
-const UNSUPPORTED: &[(&[&str], &str)] = &[
-    (&["youtube.com", "youtu.be", "youtube-nocookie.com"], "YouTube"),
-    (&["instagram.com"], "Instagram"),
-    (&["facebook.com", "fb.watch", "fb.com"], "Facebook"),
-    (&["tiktok.com"], "TikTok"),
-    (&["netflix.com", "primevideo.com", "disneyplus.com", "hulu.com", "max.com", "hotstar.com"], "this streaming service"),
-];
+/// Streaming services whose catalogue is DRM-protected. Velora never bypasses DRM. Only the page
+/// hosts are listed; ordinary files linked from these sites are unaffected.
+const UNSUPPORTED: &[(&[&str], &str)] =
+    &[(&["netflix.com", "primevideo.com", "disneyplus.com", "hulu.com", "max.com", "hotstar.com"], "this streaming service")];
 
 /// The site name if `url` is a page on a site Velora doesn't download videos from.
 pub fn unsupported_site(url: &Url) -> Option<&'static str> {
@@ -55,17 +57,19 @@ pub fn unsupported_site(url: &Url) -> Option<&'static str> {
     UNSUPPORTED.iter().find(|(domains, _)| domains.iter().any(|d| host == *d || host.ends_with(&format!(".{d}")))).map(|(_, name)| *name)
 }
 
-/// Resolve `url` if a resolver recognises it. `Ok(None)` means "not a supported page"; an error
-/// means the page was recognised but its media couldn't be fetched (private, deleted, no video…)
-/// or belongs to a site Velora doesn't download from.
+pub fn unsupported_error(site: &str) -> ErrorInfo {
+    ErrorInfo::new(
+        "unsupported_site",
+        format!("Velora doesn't download videos from {site}. Its videos are DRM-protected, and Velora never bypasses DRM."),
+    )
+}
+
+/// Resolve `url` with the built-in resolvers. `Ok(None)` means none of them recognises the page;
+/// an error means the page was recognised but its media couldn't be fetched (private, deleted, no
+/// video…) or belongs to a site Velora doesn't download from.
 pub async fn resolve(client: &Client, url: &Url) -> Result<Option<ResolvedMedia>, ErrorInfo> {
     if let Some(site) = unsupported_site(url) {
-        return Err(ErrorInfo::new(
-            "unsupported_site",
-            format!(
-                "Velora doesn't download videos from {site}. They're protected or only available when you're signed in, and Velora never bypasses either."
-            ),
-        ));
+        return Err(unsupported_error(site));
     }
     if x::status_id(url).is_some() {
         return x::resolve(client, x::SYNDICATION_ENDPOINT, url).await.map(Some);

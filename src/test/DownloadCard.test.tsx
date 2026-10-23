@@ -8,7 +8,10 @@ import type { DownloadRecord } from "@/types/engine";
 
 const base: DownloadRecord = {
   id: "d1",
+  kind: "http",
   url: "https://cdn.example.com/big.iso",
+  mediaFormat: null,
+  infoHash: null,
   finalUrl: null,
   fileName: "big.iso",
   nameAuto: false,

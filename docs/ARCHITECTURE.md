@@ -127,6 +127,51 @@ Progress resets the attempt counter, so a slow-but-alive download is never faile
 Promotes `scheduled` items whose time has arrived, applies the queue start/stop window and the
 scheduled speed limit, fills free slots from the queue, and samples speed for the dashboard chart.
 
+## Download kinds
+
+Every record has a `kind` that picks the task the scheduler runs. Queueing, pause/resume, limits,
+history and the UI are shared; only the transfer differs.
+
+| Kind | Used for | Engine |
+| --- | --- | --- |
+| `http` | Direct file links | Velora's own segmented engine (above). |
+| `media` | Video sites (YouTube, Vimeo, Instagram, TikTok…), HLS `.m3u8` and DASH `.mpd` streams, other pages yt-dlp recognises | yt-dlp, with ffmpeg to merge separate video/audio or remux streams. |
+| `torrent` | `magnet:` links and `.torrent` URLs | librqbit, in-process. |
+
+### Media (yt-dlp + ffmpeg)
+
+- **Resolving.** X posts use the built-in resolver. Known video sites and stream manifests go to
+  `yt-dlp -J`; other HTML pages are tried only once yt-dlp is installed, so plain file links never
+  wait for it. The format list becomes a few choices (one per resolution plus audio only), each
+  carrying a yt-dlp format selector. DRM streaming services stay refused.
+- **Helpers on first use.** `tools.rs` downloads `yt-dlp.exe` and the LGPL ffmpeg build from the
+  projects' official GitHub releases into `%APPDATA%\com.velora.downloadmanager\tools\`. Each file
+  is checked against the SHA-256 list from the same release before it is moved into place. yt-dlp is
+  refreshed in the background once it is a week old; ffmpeg is fetched only when a download needs a
+  merge or an HLS/DASH remux.
+- **Running.** yt-dlp runs without a console window inside a Windows Job Object, so pausing ends it
+  and every process it started (its Python child, ffmpeg). Progress comes from a
+  `--progress-template` line; separate video and audio streams are added up so the bar only moves
+  forward. yt-dlp's `.part` files make pause/resume work; cancelling deletes them.
+
+### Torrents (librqbit)
+
+- One session for the whole app, started on first use. DHT state and each torrent's metadata
+  (`<info hash>.torrent`) are kept in `%APPDATA%\com.velora.downloadmanager\torrents\`, so a magnet
+  link is resolved through the network only once.
+- Outgoing connections only (no listening port, so no firewall prompt). Velora downloads; it
+  doesn't seed. A torrent leaves the session when it finishes, pauses or is cancelled. Resuming adds
+  it back and librqbit re-checks the pieces on disk.
+- Layout: multi-file torrents get their own folder, a single file goes straight into the
+  destination. If that name is taken, Velora uses a fresh folder, because the file name is fixed by
+  the torrent. The record's `infoHash` marks that Velora chose the path, and only such paths are
+  deleted on cancel.
+
+### Keeping the PC awake
+
+While anything is downloading, the app asks Windows not to sleep (`SetThreadExecutionState` with
+`ES_SYSTEM_REQUIRED`); the display can still turn off.
+
 ## Storage
 
 - `%APPDATA%\com.velora.downloadmanager\velora.db` — SQLite, WAL. Tables: `downloads`, `settings`.

@@ -11,6 +11,9 @@
 //! * Retry with exponential backoff, jitter and `Retry-After`.
 //! * Global, per-download and scheduled bandwidth limits.
 //! * Persistent queue, scheduling, categories, duplicate detection, SHA-256 verification.
+//! * Video pages and HLS/DASH streams through yt-dlp (fetched and verified on first use), with
+//!   ffmpeg merging separate video and audio.
+//! * BitTorrent magnet links and `.torrent` files through librqbit.
 
 pub mod category;
 pub mod download;
@@ -18,9 +21,12 @@ mod engine;
 pub mod media;
 pub mod model;
 pub mod net;
+pub mod process;
 pub mod security;
 pub mod settings;
 pub mod storage;
+pub mod tools;
+pub mod torrent;
 pub mod util;
 
 pub use engine::{ClearScope, Engine, EngineConfig, EventSink};

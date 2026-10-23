@@ -9,7 +9,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-tokio.workspace = true
+tokio = { workspace = true, features = ["process"] }
 tokio-util.workspace = true
 reqwest.workspace = true
 futures-util.workspace = true
@@ -26,13 +26,20 @@ percent-encoding = "2"
 httpdate = "1"
 rand = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# BitTorrent (magnet links and .torrent files).
+librqbit = { version = "9.0.1", default-features = false, features = ["default-tls"] }
+# Unpacking the ffmpeg build fetched on first use.
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
+  "Win32_Security",
   "Win32_Storage_FileSystem",
   "Win32_System_IO",
   "Win32_System_Ioctl",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
 ] }
 
 [dev-dependencies]

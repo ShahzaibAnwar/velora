@@ -7,6 +7,15 @@ All notable changes to Velora are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Video sites and streams through yt-dlp: YouTube, Vimeo, Instagram, TikTok, Facebook, Reddit,
+  SoundCloud and the other sites yt-dlp supports, plus HLS (`.m3u8`) and DASH (`.mpd`) links. The Add
+  dialog lists one choice per resolution plus audio only. yt-dlp and ffmpeg are downloaded from their
+  official GitHub releases on first use and checked against the published SHA-256 lists. Pause and
+  resume continue partial files. DRM streaming services are still refused.
+- BitTorrent: magnet links and `.torrent` URLs (librqbit). Metadata is cached, pieces already on disk
+  are re-checked on resume, and multi-file torrents get their own folder. Download only; no seeding
+  and no listening port.
+- The PC no longer goes to sleep while downloads are running.
 - X (Twitter) post videos: a post link resolves to the post's public MP4 files (quality picker in the
   Add dialog; best quality when the browser sends a post directly). Public posts only.
 - Extension 0.1.1: "Video in this post" on X, right-clicking an X video sends the post, and a clear

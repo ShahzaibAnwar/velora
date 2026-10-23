@@ -16,6 +16,7 @@ pub fn make_sink(app: AppHandle, prefs: Arc<RwLock<Settings>>) -> EventSink {
     Arc::new(move |event: EngineEvent| {
         match &event {
             EngineEvent::Progress { items, total_speed } => {
+                crate::system::keep_awake::set(!items.is_empty());
                 update_taskbar(&app, items, &last_taskbar);
                 update_tray_tooltip(&app, items.len(), *total_speed);
             }

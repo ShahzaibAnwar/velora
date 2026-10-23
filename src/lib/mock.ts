@@ -40,6 +40,9 @@ const id = () => `preview-${++counter}`;
 function rec(partial: Partial<DownloadRecord> & Pick<DownloadRecord, "fileName" | "url" | "category" | "status">): DownloadRecord {
   return {
     id: id(),
+    kind: "http",
+    mediaFormat: null,
+    infoHash: null,
     finalUrl: partial.url,
     nameAuto: false,
     destDir: "C:\\Users\\you\\Downloads",
@@ -246,6 +249,10 @@ export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> =
       }
       case "probe_url": {
         const url = String(a.url);
+        if (/^magnet:/i.test(url)) {
+          const name = new URLSearchParams(url.slice(url.indexOf("?") + 1)).get("dn") || "Sample torrent";
+          return { url, finalUrl: url, fileName: name, host: "BitTorrent", size: 2310 * MB, mime: "3 files", resumable: true, etag: null, lastModified: null, contentEncoding: null, category: "video" };
+        }
         const name = decodeURIComponent(new URL(url).pathname.split("/").pop() || "download");
         return { url, finalUrl: url, fileName: name, host: new URL(url).hostname, size: 734 * MB, mime: "application/octet-stream", resumable: true, etag: '"preview"', lastModified: null, contentEncoding: null, category: categoryOf(name) };
       }
@@ -260,6 +267,8 @@ export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> =
         const name = req.fileName || decodeURIComponent(new URL(req.url).pathname.split("/").pop() || "download");
         const mode = req.start?.mode ?? "now";
         const r = rec({
+          kind: /^magnet:/i.test(req.url) ? "torrent" : req.mediaFormat ? "media" : "http",
+          mediaFormat: req.mediaFormat ?? null,
           url: req.url,
           fileName: name,
           category: req.category ?? categoryOf(name),
@@ -361,6 +370,20 @@ export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> =
         return "";
       case "resolve_media": {
         const url = String(a.url);
+        if (/^https:\/\/(www\.)?(youtube\.com\/watch|youtu\.be\/)/.test(url)) {
+          // What yt-dlp reports for a video page (preview data).
+          return {
+            source: "YouTube",
+            pageUrl: url,
+            title: "Sample video title (preview data)",
+            author: "Example Channel",
+            variants: [
+              { url, label: "1080p", width: 1920, height: 1080, bitrate: 4_400_000, mime: "video/mp4", fileName: "Sample video title (1080p).mp4", format: "bv*[height=1080][ext=mp4]+ba[ext=m4a]/bv*[height=1080]+ba/b[height=1080]", size: 212 * MB },
+              { url, label: "720p", width: 1280, height: 720, bitrate: 2_300_000, mime: "video/mp4", fileName: "Sample video title (720p).mp4", format: "bv*[height=720][ext=mp4]+ba[ext=m4a]/bv*[height=720]+ba/b[height=720]", size: 118 * MB },
+              { url, label: "Audio only · m4a", width: null, height: null, bitrate: 129_000, mime: "audio/m4a", fileName: "Sample video title.m4a", format: "ba[ext=m4a]/ba", size: 9 * MB },
+            ],
+          };
+        }
         if (!/^https:\/\/(www\.)?(x|twitter)\.com\/[^/]+\/status\/\d+/.test(url)) return null;
         return {
           source: "X",
@@ -368,8 +391,8 @@ export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> =
           title: "Sample post text (preview data)",
           author: "example",
           variants: [
-            { url: "https://video.twimg.com/sample/vid/avc1/1280x720/a.mp4", label: "1280×720", width: 1280, height: 720, bitrate: 2176000, mime: "video/mp4", fileName: "example_1_720p.mp4" },
-            { url: "https://video.twimg.com/sample/vid/avc1/640x360/b.mp4", label: "640×360", width: 640, height: 360, bitrate: 832000, mime: "video/mp4", fileName: "example_1_360p.mp4" },
+            { url: "https://video.twimg.com/sample/vid/avc1/1280x720/a.mp4", label: "1280×720", width: 1280, height: 720, bitrate: 2176000, mime: "video/mp4", fileName: "example_1_720p.mp4", format: null, size: null },
+            { url: "https://video.twimg.com/sample/vid/avc1/640x360/b.mp4", label: "640×360", width: 640, height: 360, bitrate: 832000, mime: "video/mp4", fileName: "example_1_360p.mp4", format: null, size: null },
           ],
         };
       }

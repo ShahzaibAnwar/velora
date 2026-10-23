@@ -96,6 +96,19 @@ impl Category {
     }
 }
 
+/// Which transfer engine runs a download.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum DownloadKind {
+    /// Plain HTTP(S) file: Velora's own segmented engine.
+    #[default]
+    Http,
+    /// A page or stream (HLS/DASH) fetched by yt-dlp, merged with ffmpeg when needed.
+    Media,
+    /// A BitTorrent magnet link or `.torrent` file.
+    Torrent,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum ChecksumState {
@@ -125,8 +138,16 @@ impl ErrorInfo {
 #[serde(rename_all = "camelCase")]
 pub struct DownloadRecord {
     pub id: String,
-    /// The URL the user (or browser) supplied.
+    #[serde(default)]
+    pub kind: DownloadKind,
+    /// The URL the user (or browser) supplied. A magnet link for torrents.
     pub url: String,
+    /// yt-dlp format selector for media downloads.
+    #[serde(default)]
+    pub media_format: Option<String>,
+    /// For torrents, set once Velora has chosen where the files go (`dest_dir/file_name`).
+    #[serde(default)]
+    pub info_hash: Option<String>,
     /// The URL after redirects, from the most recent probe.
     #[serde(default)]
     pub final_url: Option<String>,
@@ -234,6 +255,9 @@ pub struct AddRequest {
     /// Replace an existing file at the destination instead of choosing a new name.
     #[serde(default)]
     pub overwrite: bool,
+    /// yt-dlp format selector from a resolved media variant; makes this a media download.
+    #[serde(default)]
+    pub media_format: Option<String>,
 }
 
 /// What the server told us about a URL.

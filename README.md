@@ -35,6 +35,12 @@
   problems, full disk) fail fast with a readable message.
 - Real bandwidth limiting (global, per download, and a scheduled limit for set hours).
 - Optional SHA-256 verification.
+- **Video sites and streams** through [yt-dlp](https://github.com/yt-dlp/yt-dlp): YouTube, Vimeo,
+  Instagram, TikTok, SoundCloud and more, plus HLS (`.m3u8`) and DASH (`.mpd`) links, with a choice of
+  resolution or audio only. ffmpeg merges separate video and audio. Both are fetched from their
+  official releases on first use and verified against the published SHA-256 lists.
+- **BitTorrent** magnet links and `.torrent` files (librqbit), with metadata caching and resume.
+- Keeps the PC awake while downloads run.
 
 **Management**
 - Persistent queue with priorities, drag-to-reorder and a maximum number of simultaneous downloads.
@@ -64,12 +70,9 @@
 ## What Velora does not do
 
 - It does not bypass DRM, paywalls, logins or any access control, and it never reads browser cookies.
-- It does not download HLS/DASH streams or browser-only (`blob:`) streams in this release; they are
-  labelled as such.
-- It does not download from YouTube, Instagram, Facebook, TikTok or subscription streaming services.
-  Their videos are either protected (DRM or obfuscated stream signatures, which Velora would have to
-  break) or only available when signed in. Velora supports sites only where the video is an ordinary
-  public file, such as X posts and direct video links.
+- It does not download from DRM-protected subscription streaming services (Netflix, Prime Video,
+  Disney+…). Videos that need you to be signed in are not downloaded either.
+- It does not seed torrents or open a listening port; it downloads and stops.
 - It never disables TLS certificate checks.
 - It has no accounts, telemetry, ads or cloud services.
 - Schedules run only while Velora is running (it can sit in the tray); there is no background service.

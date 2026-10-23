@@ -146,7 +146,12 @@ async fn process(req: BridgeRequest, app: &AppHandle, state: &BridgeState) -> Br
                     "Velora didn't allow this browser extension. You can approve it in Velora's Browser Integration page.",
                 );
             }
-            if let Err(e) = velora_engine::security::parse_download_url(&url) {
+            let valid = if velora_engine::torrent::is_torrent_link(&url) {
+                velora_engine::torrent::parse_torrent_link(&url).map(|_| ())
+            } else {
+                velora_engine::security::parse_download_url(&url).map(|_| ())
+            };
+            if let Err(e) = valid {
                 return BridgeResponse::error(e.message);
             }
             if engine.settings().show_add_dialog_for_browser {
@@ -154,25 +159,27 @@ async fn process(req: BridgeRequest, app: &AppHandle, state: &BridgeState) -> Br
                 let _ = app.emit("bridge://add", BrowserAdd { url, referrer, filename, page_title });
                 BridgeResponse { ok: true, version, ..Default::default() }
             } else {
-                // A page with a known media resolver (e.g. an X post) downloads its best video file,
+                // A page with a media resolver (an X post, a video site…) downloads its best video,
                 // not the page itself.
-                let (url, referrer, filename) = match engine.resolve_media(&url).await {
+                let (url, referrer, filename, media_format) = match engine.resolve_media(&url).await {
                     Ok(Some(media)) => {
                         let best = &media.variants[0];
-                        (best.url.clone(), Some(media.page_url.clone()), Some(best.file_name.clone()))
+                        (best.url.clone(), Some(media.page_url.clone()), Some(best.file_name.clone()), best.format.clone())
                     }
                     Ok(None) => {
                         // Never silently save a web page when the browser meant to send a file.
-                        if let Ok(info) = engine.probe(&url, referrer.as_deref()).await {
-                            if info.mime.as_deref().is_some_and(|m| m.to_ascii_lowercase().starts_with("text/html")) {
-                                return BridgeResponse::error("That link opens a web page, not a downloadable file.");
+                        if !velora_engine::torrent::is_torrent_link(&url) {
+                            if let Ok(info) = engine.probe(&url, referrer.as_deref()).await {
+                                if info.mime.as_deref().is_some_and(|m| m.to_ascii_lowercase().starts_with("text/html")) {
+                                    return BridgeResponse::error("That link opens a web page, not a downloadable file.");
+                                }
                             }
                         }
-                        (url, referrer, filename)
+                        (url, referrer, filename, None)
                     }
                     Err(e) => return BridgeResponse::error(e.message),
                 };
-                let request = AddRequest { url, referrer, file_name: filename, start: StartMode::Now, ..Default::default() };
+                let request = AddRequest { url, referrer, file_name: filename, media_format, start: StartMode::Now, ..Default::default() };
                 match engine.add(request) {
                     Ok(rec) => BridgeResponse { ok: true, version, download_id: Some(rec.id), ..Default::default() },
                     Err(e) => BridgeResponse::error(e.message),

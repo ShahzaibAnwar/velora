@@ -6,7 +6,10 @@ import type { DownloadRecord } from "@/types/engine";
 function record(partial: Partial<DownloadRecord>): DownloadRecord {
   return {
     id: "a",
+    kind: "http",
     url: "https://example.com/a.zip",
+    mediaFormat: null,
+    infoHash: null,
     finalUrl: null,
     fileName: "a.zip",
     nameAuto: false,

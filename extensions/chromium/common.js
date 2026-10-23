@@ -41,14 +41,17 @@ export function fileNameOf(url) {
 }
 
 /**
- * Classify a URL found on a page. Only direct files are offered for download; streaming manifests and
- * MediaSource/blob streams are labelled but never downloaded (Velora does not circumvent streaming
- * protections and does not reassemble streams in this release).
+ * Classify a URL found on a page. Direct files, magnet links and HLS/DASH playlists (which Velora
+ * downloads with yt-dlp and ffmpeg) are offered; other manifests and MediaSource/blob streams are
+ * labelled but not sent (send the page itself instead).
  */
 export function classify(url, tag) {
-  if (/^blob:/i.test(url)) return { kind: "stream", label: "Browser stream — can't be downloaded directly" };
+  if (/^blob:/i.test(url)) return { kind: "stream", label: "Browser stream — send this page instead" };
+  if (/^magnet:\?/i.test(url)) return { kind: "file", label: "Magnet link (torrent)" };
   if (!isHttp(url)) return null;
   const ext = extensionOf(url);
+  if (ext === "m3u8") return { kind: "file", label: "HLS stream" };
+  if (ext === "mpd") return { kind: "file", label: "DASH stream" };
   if (MANIFEST_EXTENSIONS.has(ext)) return { kind: "manifest", label: "Streaming playlist — not supported" };
   if (FILE_EXTENSIONS.has(ext)) return { kind: "file", label: ext.toUpperCase() + " file" };
   if (tag === "video" || tag === "audio") return { kind: "file", label: tag === "video" ? "Video file" : "Audio file" };
@@ -67,16 +70,12 @@ export function isXPost(url) {
 }
 
 const UNSUPPORTED_SITES = [
-  [/(^|\.)youtube\.com$|(^|\.)youtu\.be$/, "YouTube"],
-  [/(^|\.)instagram\.com$/, "Instagram"],
-  [/(^|\.)facebook\.com$|(^|\.)fb\.watch$/, "Facebook"],
-  [/(^|\.)tiktok\.com$/, "TikTok"],
   [/(^|\.)netflix\.com$|(^|\.)primevideo\.com$|(^|\.)disneyplus\.com$|(^|\.)hulu\.com$|(^|\.)max\.com$|(^|\.)hotstar\.com$/, "this streaming service"],
 ];
 
 /**
- * Sites whose videos Velora deliberately doesn't download: they are protected (DRM or obfuscated
- * stream signatures) or only available when signed in, and Velora never bypasses either.
+ * Streaming services whose videos are DRM-protected; Velora never bypasses DRM. Other video sites
+ * (YouTube, Instagram…) are sent to Velora, which reads them with yt-dlp.
  */
 export function unsupportedVideoSite(url) {
   try {

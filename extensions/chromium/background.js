@@ -26,11 +26,12 @@ async function flash(ok) {
 
 api.contextMenus.onClicked.addListener(async (info, tab) => {
   let url = info.menuItemId === MENU_LINK ? info.linkUrl : info.menuItemId === MENU_MEDIA ? info.srcUrl : info.pageUrl;
-  // X plays videos as browser streams (blob:); send the post instead and Velora fetches its MP4.
-  if (info.menuItemId === MENU_MEDIA && !isHttp(url) && isXPost(info.pageUrl)) url = info.pageUrl;
-  // Pages on sites Velora deliberately doesn't download from (YouTube, Instagram…) are not sent;
-  // Velora would only be able to save the web page itself.
-  if (!isHttp(url) || unsupportedVideoSite(url)) {
+  // Sites play videos as browser streams (blob:); send the page instead and Velora reads it (the
+  // post's MP4 on X, yt-dlp elsewhere).
+  if (info.menuItemId === MENU_MEDIA && !isHttp(url) && isHttp(info.pageUrl)) url = info.pageUrl;
+  const magnet = /^magnet:\?/i.test(url ?? "");
+  // DRM streaming services are not sent; Velora could only save the web page itself.
+  if ((!isHttp(url) && !magnet) || unsupportedVideoSite(url)) {
     await flash(false);
     return;
   }

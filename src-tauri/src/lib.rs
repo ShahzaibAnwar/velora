@@ -66,7 +66,11 @@ pub fn request_quit(app: &AppHandle) {
 }
 
 fn urls_from_args(args: &[String]) -> Vec<String> {
-    args.iter().skip(1).filter(|a| a.starts_with("http://") || a.starts_with("https://")).cloned().collect()
+    args.iter()
+        .skip(1)
+        .filter(|a| a.starts_with("http://") || a.starts_with("https://") || a.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("magnet:")))
+        .cloned()
+        .collect()
 }
 
 pub fn run() {
@@ -101,7 +105,8 @@ pub fn run() {
             let db_path = data_dir.join("velora.db");
             let prefs = Arc::new(RwLock::new(velora_engine::Settings::default()));
             let sink = events::make_sink(handle.clone(), prefs.clone());
-            let engine = tauri::async_runtime::block_on(Engine::open(EngineConfig::new(Some(db_path.clone()), download_dir, sink)))
+            let config = EngineConfig::new(Some(db_path.clone()), download_dir, sink).with_data_dir(data_dir.clone());
+            let engine = tauri::async_runtime::block_on(Engine::open(config))
                 .map_err(|e| format!("Velora couldn't open its database: {}", e.message))?;
             let settings = engine.settings();
             *prefs.write().unwrap() = settings.clone();

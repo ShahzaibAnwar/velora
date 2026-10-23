@@ -52,7 +52,7 @@ document.getElementById("send-page").addEventListener("click", async (e) => {
   }
   const blocked = unsupportedVideoSite(tab.url);
   if (blocked) {
-    setStatus(`Velora doesn't download videos from ${blocked}. They're protected or only available when signed in.`, "warn");
+    setStatus(`Velora doesn't download videos from ${blocked}. They're DRM-protected.`, "warn");
     return;
   }
   await send(tab.url, button);
@@ -112,7 +112,7 @@ document.getElementById("scan").addEventListener("click", async (e) => {
   if (blocked && !classified.some((i) => i.info.kind === "file")) {
     const li = document.createElement("li");
     li.className = "notice";
-    li.textContent = `Velora doesn't download videos from ${blocked}. They're protected or only available when signed in, and Velora never bypasses either.`;
+    li.textContent = `Velora doesn't download videos from ${blocked}. They're DRM-protected, and Velora never bypasses DRM.`;
     listEl.append(li);
   }
   for (const item of classified) {

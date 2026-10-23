@@ -23,12 +23,13 @@ export function extractUrls(text: string): string[] {
   const out: string[] = [];
   for (const token of text.split(/\s+/)) {
     const t = token.trim().replace(/^[<("']+|[>)"',.]+$/g, "");
-    if (/^https?:\/\/\S+$/i.test(t) && !out.includes(t)) out.push(t);
+    if (/^(https?:\/\/\S+|magnet:\?\S+)$/i.test(t) && !out.includes(t)) out.push(t);
   }
   return out;
 }
 
 function nameFromUrl(url: string) {
+  if (/^magnet:/i.test(url)) return new URLSearchParams(url.slice(url.indexOf("?") + 1)).get("dn") || "Torrent";
   try {
     const last = new URL(url).pathname.split("/").filter(Boolean).pop();
     return last ? decodeURIComponent(last) : hostOf(url);
@@ -148,6 +149,27 @@ export function AddDownloadDialog() {
       return;
     }
     const seq = ++probeSeq.current;
+    if (media.state === "ok" && chosen?.format) {
+      // yt-dlp downloads this one; the page itself isn't the file, so describe the chosen stream.
+      const audio = chosen.mime.startsWith("audio/");
+      setProbe({
+        state: "ok",
+        info: {
+          url: target,
+          finalUrl: target,
+          fileName: chosen.fileName,
+          host: media.media.source,
+          size: chosen.size,
+          mime: chosen.mime,
+          resumable: true,
+          etag: null,
+          lastModified: null,
+          contentEncoding: null,
+          category: audio ? "audio" : "video",
+        },
+      });
+      return;
+    }
     const fromMedia = media.state === "ok";
     setProbe({ state: "loading" });
     (async () => {
@@ -162,7 +184,7 @@ export function AddDownloadDialog() {
         if (!fromMedia) setFileName((n) => (nameEdited.current && n ? n : nameFromUrl(target)));
       }
     })();
-  }, [target, targetReferrer, open, media]);
+  }, [target, targetReferrer, open, media, chosen]);
 
   const chooseVariant = (index: number) => {
     setVariant(index);
@@ -186,6 +208,7 @@ export function AddDownloadDialog() {
     speedLimit: limit.trim() ? parseRate(limit) || null : null,
     checksum: single ? checksum.trim() || null : null,
     referrer: single ? targetReferrer : referrer,
+    mediaFormat: single ? (chosen?.format ?? null) : null,
     ...extra,
   });
 
@@ -209,7 +232,7 @@ export function AddDownloadDialog() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [target, targetReferrer, single, fileName, destDir, category, priority, connections, when, scheduleAt, checksum, limit, referrer, effectiveCategory],
+    [target, targetReferrer, single, fileName, destDir, category, priority, connections, when, scheduleAt, checksum, limit, referrer, effectiveCategory, chosen],
   );
 
   const submit = async () => {
@@ -236,7 +259,7 @@ export function AddDownloadDialog() {
             skipped++;
             continue;
           }
-          await api.add(buildRequest(url, m ? { fileName: m.variants[0].fileName, referrer: m.pageUrl } : {}));
+          await api.add(buildRequest(url, m ? { fileName: m.variants[0].fileName, referrer: m.pageUrl, mediaFormat: m.variants[0].format } : {}));
           added++;
         } catch (e) {
           toast.error(`Couldn't add ${nameFromUrl(link)}`, toError(e).message);

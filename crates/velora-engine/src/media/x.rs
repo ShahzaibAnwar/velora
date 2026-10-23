@@ -197,6 +197,8 @@ pub async fn resolve(client: &Client, endpoint: &str, page: &Url) -> Result<Reso
                 bitrate: v.bitrate,
                 mime: "video/mp4".into(),
                 file_name: sanitize_file_name(&format!("{stem}{suffix}{res}.mp4")),
+                format: None,
+                size: None,
             });
         }
     }

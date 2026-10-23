@@ -14,6 +14,8 @@ export type DownloadStatus =
 export type Priority = "low" | "normal" | "high";
 export type Category = "video" | "audio" | "image" | "document" | "archive" | "application" | "other";
 export type ChecksumState = "none" | "pending" | "verified" | "mismatch";
+/** `http`: Velora's segmented engine. `media`: yt-dlp (+ ffmpeg). `torrent`: BitTorrent. */
+export type DownloadKind = "http" | "media" | "torrent";
 
 export interface ErrorInfo {
   code: string;
@@ -22,7 +24,11 @@ export interface ErrorInfo {
 
 export interface DownloadRecord {
   id: string;
+  kind: DownloadKind;
+  /** A magnet link for torrents. */
   url: string;
+  mediaFormat: string | null;
+  infoHash: string | null;
   finalUrl: string | null;
   fileName: string;
   nameAuto: boolean;
@@ -66,6 +72,8 @@ export interface AddRequest {
   checksum?: string | null;
   referrer?: string | null;
   overwrite?: boolean;
+  /** yt-dlp format selector from a resolved media variant. */
+  mediaFormat?: string | null;
 }
 
 export interface ProbeInfo {
@@ -90,9 +98,12 @@ export interface MediaVariant {
   bitrate: number | null;
   mime: string;
   fileName: string;
+  /** yt-dlp format selector; when set, `url` is the page and yt-dlp downloads it. */
+  format: string | null;
+  size: number | null;
 }
 
-/** A page (e.g. an X post) resolved to the direct media files it shows. Best variant first. */
+/** A page (an X post, a video site, an HLS stream…) resolved to what it offers. Best variant first. */
 export interface ResolvedMedia {
   source: string;
   pageUrl: string;

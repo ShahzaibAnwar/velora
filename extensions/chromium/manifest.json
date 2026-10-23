@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Velora Download Manager",
   "short_name": "Velora",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Send links, files and media to Velora Download Manager.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoBw3gZAWIXZ7Lzc7a+e/PrvFaZT/UCDaU8N28v7hq5jEgHy5vMbw/4FsT6GHb3f/u4qgCrcAVRY58CL6IaQEJvyGifNRIudKlLeB3XqEoLCuvdyG4oPZW9ha4PNao6LdO6tZ76P8/pW1WDcvXfpOALlL5kunVqcsSUFeFkqrQnhp1KcAMKAwcmwqi7Eqs+WBYBu+/voaL0KmnazvhtMAixWzqvkxRA9gMnTbUoL2WQgWFC6K/+GsbCyIKFSIxFc/YynCN3zr1fsawCTyBgytkrWlIXSdduBuYpHjOeVfGf6JtPz0zefCJ5cZTTdO/GqtkEa24pDqr9E8n6g5ukIzYwIDAQAB",
   "minimum_chrome_version": "116",
