@@ -6,6 +6,8 @@ All notable changes to Velora are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] — 2026-10-23 (development pre-release)
+
 ### Added
 - Video sites and streams through yt-dlp: YouTube, Vimeo, Instagram, TikTok, Facebook, Reddit,
   SoundCloud and the other sites yt-dlp supports, plus HLS (`.m3u8`) and DASH (`.mpd`) links. The Add
@@ -16,6 +18,8 @@ All notable changes to Velora are documented here. The format follows
   are re-checked on resume, and multi-file torrents get their own folder. Download only; no seeding
   and no listening port.
 - The PC no longer goes to sleep while downloads are running.
+- Extension 0.1.3: sends video pages (right-click a playing video) and magnet links, and offers HLS/DASH
+  links found on a page. Only DRM streaming services are still refused.
 - X (Twitter) post videos: a post link resolves to the post's public MP4 files (quality picker in the
   Add dialog; best quality when the browser sends a post directly). Public posts only.
 - Extension 0.1.1: "Video in this post" on X, right-clicking an X video sends the post, and a clear
@@ -36,7 +40,7 @@ All notable changes to Velora are documented here. The format follows
 - The window opened maximised on small or highly scaled screens; it now fits and centres on first launch.
 - Idle CPU use with the dashboard open (≈14% → ≈2% of one core).
 
-## [0.1.0-alpha.1] — not yet released
+## [0.1.0-alpha.1] — 2026-10-21 (development pre-release)
 
 First development build.
 
