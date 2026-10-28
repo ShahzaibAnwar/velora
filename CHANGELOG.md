@@ -6,6 +6,8 @@ All notable changes to Velora are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0-alpha.3] — 2026-10-28 (development pre-release)
+
 ### Fixed
 - A first YouTube (or other video) link could stay on "Checking server" indefinitely while yt-dlp was
   being fetched: GitHub requests had no response timeout, and a stalled or very slow connection was

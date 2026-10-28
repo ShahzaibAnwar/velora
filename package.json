@@ -1,7 +1,7 @@
 {
   "name": "velora-download-manager",
   "private": true,
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.3",
   "description": "Velora Download Manager — download beautifully, accelerate everything.",
   "license": "MIT",
   "repository": {

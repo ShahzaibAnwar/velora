@@ -366,7 +366,7 @@ export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> =
         settings = { ...(a.settings as unknown as Settings) };
         return { ...settings };
       case "app_info":
-        return { version: "0.1.0-alpha.2 (preview)", dataDir: "C:\\Users\\you\\AppData\\Roaming\\com.velora.downloadmanager", logDir: "C:\\Users\\you\\AppData\\Local\\com.velora.downloadmanager\\logs", dbPath: "velora.db", defaultDownloadDir: "C:\\Users\\you\\Downloads", platform: "preview" };
+        return { version: "0.1.0-alpha.3 (preview)", dataDir: "C:\\Users\\you\\AppData\\Roaming\\com.velora.downloadmanager", logDir: "C:\\Users\\you\\AppData\\Local\\com.velora.downloadmanager\\logs", dbPath: "velora.db", defaultDownloadDir: "C:\\Users\\you\\Downloads", platform: "preview" };
       case "native_messaging_status":
         return { ...nm };
       case "register_native_messaging":
