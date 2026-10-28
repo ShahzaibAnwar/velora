@@ -364,6 +364,30 @@ impl Engine {
         }
     }
 
+    /// The helper program being installed for video support, if any (for "Setting up…" in the UI).
+    pub fn tool_setup(&self) -> Option<crate::tools::ToolSetup> {
+        self.inner.tools.setup()
+    }
+
+    /// Fetch yt-dlp in the background after `delay`, so the first video link doesn't wait for it.
+    /// Does nothing when it is already installed or on `PATH`.
+    pub fn prepare_media_tools(&self, delay: Duration) {
+        let inner = self.inner.clone();
+        self.inner.rt.spawn(async move {
+            tokio::select! {
+                _ = inner.shutdown.cancelled() => return,
+                _ = tokio::time::sleep(delay) => {}
+            }
+            if inner.tools.ytdlp().is_some() {
+                return;
+            }
+            let client = inner.client.read().unwrap().clone();
+            if let Err(e) = inner.tools.ensure_ytdlp(&client).await {
+                tracing::warn!(error = %e.message, "couldn't prepare yt-dlp in the background");
+            }
+        });
+    }
+
     /// Check a prospective download for duplicates and name conflicts without adding it.
     pub fn check_add(
         &self,

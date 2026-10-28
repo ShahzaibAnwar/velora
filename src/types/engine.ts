@@ -112,6 +112,13 @@ export interface ResolvedMedia {
   variants: MediaVariant[];
 }
 
+/** A helper program (yt-dlp, ffmpeg) being downloaded on first use. */
+export interface ToolSetup {
+  tool: string;
+  downloaded: number;
+  total: number | null;
+}
+
 export interface AddCheck {
   duplicateOf: DownloadRecord | null;
   fileExists: boolean;

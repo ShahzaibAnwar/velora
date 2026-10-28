@@ -147,8 +147,11 @@ history and the UI are shared; only the transfer differs.
 - **Helpers on first use.** `tools.rs` downloads `yt-dlp.exe` and the LGPL ffmpeg build from the
   projects' official GitHub releases into `%APPDATA%\com.velora.downloadmanager\tools\`. Each file
   is checked against the SHA-256 list from the same release before it is moved into place. yt-dlp is
-  refreshed in the background once it is a week old; ffmpeg is fetched only when a download needs a
-  merge or an HLS/DASH remux.
+  fetched in the background 20 s after start-up if missing, and refreshed once it is a week old;
+  ffmpeg is fetched only when a download needs a merge or an HLS/DASH remux. Helper downloads give
+  up on a server that doesn't answer within 30 s, replace connections that stall (60 s) or crawl
+  (under 64 KB/s over 15 s) and resume with a `Range` request; the Add dialog polls
+  `get_tool_setup` to show progress instead of "Checking server".
 - **Running.** yt-dlp runs without a console window inside a Windows Job Object, so pausing ends it
   and every process it started (its Python child, ffmpeg). Progress comes from a
   `--progress-template` line; separate video and audio streams are added up so the bar only moves

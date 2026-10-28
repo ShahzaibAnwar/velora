@@ -12,7 +12,7 @@ import { CATEGORIES, FileIcon, categoryMeta } from "@/lib/fileTypes";
 import { formatBytes, formatSpeed, hostOf, parseRate } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
-import type { AddCheck, AddRequest, Category, Priority, ProbeInfo, ResolvedMedia, StartMode } from "@/types/engine";
+import type { AddCheck, AddRequest, Category, Priority, ProbeInfo, ResolvedMedia, StartMode, ToolSetup } from "@/types/engine";
 
 type Probe = { state: "idle" } | { state: "loading" } | { state: "ok"; info: ProbeInfo } | { state: "error"; message: string };
 type Media = { state: "idle" } | { state: "loading" } | { state: "none" } | { state: "ok"; media: ResolvedMedia } | { state: "error"; message: string };
@@ -71,6 +71,8 @@ export function AddDownloadDialog() {
   const [media, setMedia] = useState<Media>({ state: "idle" });
   const [variant, setVariant] = useState(0);
   const mediaSeq = useRef(0);
+  // yt-dlp/ffmpeg being fetched on first use, shown instead of "Checking server".
+  const [setup, setSetup] = useState<ToolSetup | null>(null);
 
   const urls = useMemo(() => extractUrls(text), [text]);
   const single = urls.length === 1 ? urls[0] : null;
@@ -137,6 +139,26 @@ export function AddDownloadDialog() {
     }, 420);
     return () => window.clearTimeout(t);
   }, [single, open]);
+
+  // While a page is being read, report a first-use helper install so it doesn't look stuck.
+  useEffect(() => {
+    if (media.state !== "loading") {
+      setSetup(null);
+      return;
+    }
+    let alive = true;
+    const poll = () =>
+      api
+        .toolSetup()
+        .then((s) => alive && setSetup(s))
+        .catch(() => {});
+    poll();
+    const t = window.setInterval(poll, 500);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [media.state]);
 
   // Step 2: inspect the file that will actually be downloaded.
   useEffect(() => {
@@ -441,8 +463,11 @@ export function AddDownloadDialog() {
                   </div>
                   <div className="shrink-0">
                     {probe.state === "loading" && (
-                      <span className="flex items-center gap-1.5 text-[11.5px] text-muted">
-                        <Spinner size={13} /> Checking server
+                      <span className="flex items-center gap-1.5 text-[11.5px] text-muted" data-testid="add-status">
+                        <Spinner size={13} />
+                        {setup
+                          ? `Setting up video support${setup.total ? ` · ${Math.floor((setup.downloaded / setup.total) * 100)}%` : ""}`
+                          : "Checking server"}
                       </span>
                     )}
                     {resumeBadge}

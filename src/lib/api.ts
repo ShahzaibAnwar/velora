@@ -17,6 +17,7 @@ import type {
   ResolvedMedia,
   Settings,
   Stats,
+  ToolSetup,
 } from "@/types/engine";
 
 export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -52,6 +53,7 @@ export const api = {
   getStats: () => invoke<Stats>("get_stats"),
   probe: (url: string, referrer?: string | null) => invoke<ProbeInfo>("probe_url", { url, referrer: referrer ?? null }),
   resolveMedia: (url: string) => invoke<ResolvedMedia | null>("resolve_media", { url }),
+  toolSetup: () => invoke<ToolSetup | null>("get_tool_setup"),
   checkAdd: (url: string, fileName?: string | null, destDir?: string | null, category?: Category | null) =>
     invoke<AddCheck>("check_add", { url, fileName: fileName ?? null, destDir: destDir ?? null, category: category ?? null }),
   add: (request: AddRequest) => invoke<DownloadRecord>("add_download", { request }),

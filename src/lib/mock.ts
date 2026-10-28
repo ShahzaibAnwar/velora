@@ -208,9 +208,18 @@ function categoryOf(name: string): Category {
   return "other";
 }
 
+// The first video link in a preview session simulates yt-dlp being fetched (18 MB over ~4 s).
+const SETUP_MS = 4000;
+const SETUP_BYTES = 17_880_111;
+let setupStarted: number | null = null;
+
 export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   start();
   const a = args as Record<string, never>;
+  if (cmd === "resolve_media" && /youtube\.com|youtu\.be/.test(String(a.url)) && setupStarted === null) {
+    setupStarted = Date.now();
+    await new Promise((r) => setTimeout(r, SETUP_MS));
+  }
   await new Promise((r) => setTimeout(r, cmd === "probe_url" ? 450 : 20));
   const result: unknown = (() => {
     switch (cmd) {
@@ -368,6 +377,11 @@ export async function mockInvoke<T>(cmd: string, args: Record<string, unknown> =
         return { ...nm };
       case "read_clipboard":
         return "";
+      case "get_tool_setup": {
+        const elapsed = setupStarted === null ? SETUP_MS : Date.now() - setupStarted;
+        if (elapsed >= SETUP_MS) return null;
+        return { tool: "yt-dlp", downloaded: Math.round((SETUP_BYTES * elapsed) / SETUP_MS), total: SETUP_BYTES };
+      }
       case "resolve_media": {
         const url = String(a.url);
         if (/^https:\/\/(www\.)?(youtube\.com\/watch|youtu\.be\/)/.test(url)) {

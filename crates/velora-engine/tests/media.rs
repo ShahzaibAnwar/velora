@@ -137,8 +137,18 @@ async fn live_ytdlp_resolves_and_downloads() {
     let dir = tempfile::tempdir().unwrap();
     let config = EngineConfig::new(None, dir.path().join("dl"), Arc::new(|_| {})).with_data_dir(dir.path().join("data"));
     let engine = Engine::open(config).await.unwrap();
+    let started = std::time::Instant::now();
     let media = engine.resolve_media(&page).await.unwrap().expect("yt-dlp recognises the page");
-    println!("{} from {}: {:?}", media.title, media.source, media.variants.iter().map(|v| (&v.label, v.size)).collect::<Vec<_>>());
+    println!(
+        "{} from {} in {:.1}s: {:?}",
+        media.title,
+        media.source,
+        started.elapsed().as_secs_f64(),
+        media.variants.iter().map(|v| (&v.label, v.size)).collect::<Vec<_>>()
+    );
+    if std::env::var_os("VELORA_LIVE_RESOLVE_ONLY").is_some() {
+        return;
+    }
     let pick = media.variants.iter().rev().find(|v| v.height.is_some_and(|h| h <= 360)).unwrap_or(&media.variants[0]);
     let rec = engine
         .add(AddRequest {

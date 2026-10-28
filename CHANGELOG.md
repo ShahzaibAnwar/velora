@@ -6,6 +6,17 @@ All notable changes to Velora are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- A first YouTube (or other video) link could stay on "Checking server" indefinitely while yt-dlp was
+  being fetched: GitHub requests had no response timeout, and a stalled or very slow connection was
+  waited on forever. Helper downloads now time out (30 s without a response, 60 s without data),
+  replace connections slower than 64 KB/s and resume from the current byte, and the Add dialog shows
+  "Setting up video support · N%" while this happens.
+
+### Changed
+- yt-dlp is fetched in the background 20 s after start-up when it isn't installed yet, so the first
+  video link doesn't wait for it.
+
 ## [0.1.0-alpha.2] — 2026-10-23 (development pre-release)
 
 ### Added

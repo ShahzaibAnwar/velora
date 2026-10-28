@@ -110,6 +110,8 @@ pub fn run() {
                 .map_err(|e| format!("Velora couldn't open its database: {}", e.message))?;
             let settings = engine.settings();
             *prefs.write().unwrap() = settings.clone();
+            // Video links need yt-dlp; fetch it quietly after start-up rather than on first use.
+            engine.prepare_media_tools(std::time::Duration::from_secs(20));
             logs.set_verbose(settings.diagnostic_logs);
 
             let clipboard = Arc::new(ClipboardWatcher::new(settings.clipboard_monitor));
@@ -194,6 +196,7 @@ pub fn run() {
             commands::downloads::get_stats,
             commands::downloads::probe_url,
             commands::downloads::resolve_media,
+            commands::downloads::get_tool_setup,
             commands::downloads::check_add,
             commands::downloads::add_download,
             commands::downloads::pause_download,

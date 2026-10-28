@@ -34,6 +34,12 @@ pub async fn resolve_media(state: State<'_, AppState>, url: String) -> CmdResult
     engine.resolve_media(&url).await
 }
 
+/// The helper program (yt-dlp, ffmpeg) being installed, if any.
+#[tauri::command]
+pub fn get_tool_setup(state: State<'_, AppState>) -> Option<velora_engine::tools::ToolSetup> {
+    state.engine.tool_setup()
+}
+
 #[tauri::command]
 pub fn check_add(
     state: State<'_, AppState>,
